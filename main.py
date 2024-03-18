@@ -11,9 +11,12 @@ from aiohttp import web
 import json
 
 import asyncio
-channel_name = 'Word at a Time Story'
+#TODO: This is for dev only
+debug = True
+channel_name = 'teststory'
+meta_channel_name = 'teststory-meta'
 guild_id = 936034644166598757
-db = 'live.db'
+db = 'test1.db'
 websockets = []  # Global list to keep track of WebSocket connections
 intents = discord.Intents.default()
 intents.message_content = True
@@ -36,14 +39,49 @@ def initialize_db():
             timestamp DATETIME,
             user TEXT,
             createdOn DATETIME,
-            meta_message TEST,
+            meta_message TEXT,
             avatar_url
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bot_last_message (
+            channel_id INTEGER PRIMARY KEY,
+            message_id INTEGER
+        )
+    ''')
+                   
     conn.commit()
     conn.close()
 
 
+
+def save_last_message(channel_id, message_id):
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO bot_last_message (channel_id, message_id)
+        VALUES (?, ?)
+        ON CONFLICT(channel_id) DO UPDATE SET message_id = excluded.message_id;
+    ''', (channel_id, message_id))
+    conn.commit()
+    conn.close()
+
+def get_last_bot_message(channel_id):
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    cursor.execute('SELECT message_id FROM bot_last_message WHERE channel_id = ?', (channel_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+async def delete_last_message(channel):
+    last_message_id = get_last_bot_message(channel.id)
+    if last_message_id:
+        try:
+            msg = await channel.fetch_message(last_message_id)
+            await msg.delete()
+        except Exception as e:
+            print(f"Failed to delete message: {e}")
 
 
 def insert_word(word, user, timestamp, meta_message, avatar_url):
@@ -62,7 +100,6 @@ def insert_word(word, user, timestamp, meta_message, avatar_url):
     finally:
         conn.close()
 
-last_author = None  # Keep track of the last author who sent a message
 
 
 
@@ -104,9 +141,6 @@ def get_all_words_detailed():
     return words_with_details
 
 async def construct_and_send_message(channel, message):
-    website_url = "https://story.deadbolt.info"
-    
-    
     words = get_all_words()
     story = ' '.join(words)
 
@@ -122,16 +156,14 @@ async def construct_and_send_message(channel, message):
     # Discord's character limit
     char_limit = 2000
     print(f'story length{len(story)}')
-    final_message = f"{story}\n\n{last_word_note}"
-    print(f'final message length {len(final_message)}')
 
-    if len(final_message) > char_limit:
+    if len(story) > char_limit:
         # Truncate story from the beginning to fit within limit
         # Note: This simple truncation may cut off a word partially; you may need more logic for cleanly cutting off.
         print('truncating message')
-        final_message = '...' + final_message[-(char_limit-3):]
-    print(f'sending a message that is {len(final_message)} characters long')
-    await message.channel.send(final_message)
+        story = '...' + story[-(char_limit-3):]
+    print(f'sending a message that is {len(story)} characters long')
+    await message.channel.send(story)
 
 
 async def scan_channel_history(channel):
@@ -182,7 +214,9 @@ async def find_forum_post_by_title(forum_channel_name, post_title):
 
 @bot.event
 async def on_ready():
-
+    if debug:
+        print("Debug mode on, do not use in production, fr")
+        
     forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
     post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
 
@@ -216,10 +250,19 @@ async def on_ready():
     print(f'Logged in as {bot.user.name}')
 
 
-class MyView(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
-    @discord.ui.button(label="View The Full Story", style=discord.ButtonStyle.primary, emoji="🧾") # Create a button with the label "😎 Click me!" with color Blurple
+class ButtonViews(discord.ui.View): 
+    def __init__(self, *, timeout: float | None = 180):
+        super().__init__(timeout=None)
+
+        full_story_button = discord.ui.Button(label="View The Full Story", style=discord.ButtonStyle.link, url='https://story.deadbolt.info')
+        self.add_item(full_story_button)
+    
+
+    @discord.ui.button(label="Edit", style=discord.ButtonStyle.primary, emoji="⚠")
     async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("View the full story at: https://story.deadbolt.info", ephemeral=True)
+        await interaction.response.send_message("edit button", ephemeral=True)
+    
+
 
 
 @bot.event
@@ -235,16 +278,19 @@ async def on_message(message):
         first_word = message_parts[0] if message_parts else None  # First word is the first part
         rest_of_message = message_parts[1] if len(message_parts) > 1 else ""  # Rest of the message is the second part, if it exists
 
+        avatar = None
         if first_word:  # Proceed if there's at least one word in the message
             author_id = message.author.id
             author_name = message.author.display_name
             timestamp = message.created_at
-            avatar = message.author.avatar.url
-
+            if message.author.avatar:
+                avatar = message.author.avatar.url
+            else:
+                avatar = ''
             last_message = get_last_message()
             if last_message is not None: #send the starter message
             # Check if this user was the last one to send a message
-                if author_name == last_message[3]: 
+                if author_name == last_message[3] and not debug: 
                     raise Exception("You were the last one to contribute to the story.")
                     pass
             
@@ -254,16 +300,27 @@ async def on_message(message):
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
             await construct_and_send_message(channel=channel, message=message)
-            await message.channel.send(view=MyView())
-            # Add a reaction to indicate successful processing
+
+            embed = discord.Embed(
+               description=f'{first_word}' 
+            )
+            embed.set_thumbnail(url=avatar)
+            embed.set_author(name=author_name)
+            #await delete_last_message(message.channel)
+            await message.channel.send(embed=embed)
+            await message.channel.send(view=ButtonViews())
             await message.add_reaction("✅")
+            await message.delete()
+            message.channel
+            #await save_last_message(channel_id=message.channel.id, message_id=message.id)
 
     except Exception as e:
         print(e)
         print(traceback.format_exc())
         # Send a message and reaction when it fails
         await message.channel.send(str(e))
-        #await message.channel.send(str(traceback.format_exc()))
+        if debug:
+            await message.channel.send(str(traceback.format_exc()))
         await message.add_reaction("❌")
 
 
@@ -340,7 +397,7 @@ async def start_web_server_and_bot():
     app.router.add_get('/ws', websocket_handler)  # WebSocket route
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
+    site = web.TCPSite(runner, 'localhost', 8081)  # Listen on localhost:8080
     await site.start()
     print('Web server running at localhost 8080')
     await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
