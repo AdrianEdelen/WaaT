@@ -11,8 +11,9 @@ from aiohttp import web
 import json
 
 import asyncio
-channel_name = 'teststory'
-db = 'testdb5.db'
+channel_name = 'Word at a Time Story'
+guild_id = 936034644166598757
+db = 'live.db'
 websockets = []  # Global list to keep track of WebSocket connections
 intents = discord.Intents.default()
 intents.message_content = True
@@ -102,7 +103,7 @@ def get_all_words_detailed():
     ]
     return words_with_details
 
-async def construct_and_send_message(channel):
+async def construct_and_send_message(channel, message):
     website_url = "https://story.deadbolt.info"
     
     
@@ -130,7 +131,7 @@ async def construct_and_send_message(channel):
         print('truncating message')
         final_message = '...' + final_message[-(char_limit-3):]
     print(f'sending a message that is {len(final_message)} characters long')
-    await channel.send(final_message)
+    await message.channel.send(final_message)
 
 
 async def scan_channel_history(channel):
@@ -151,19 +152,67 @@ async def scan_channel_history(channel):
         print("No messages found.")
 
 
+async def find_forum_post_by_title(forum_channel_name, post_title):
+    guild = bot.get_guild(guild_id)
+    if not guild:
+        print("Guild not found")
+        return None
+    else:
+        print(f"Connected to Guild: {guild.name}")
+    
+    # Find the forum channel by name
+    
+    forum_channel = discord.utils.get(guild.text_channels, name=forum_channel_name, type=discord.ChannelType.forum)
+    
+    if not forum_channel:
+        print("Forum channel not found")
+        return None
+    else:
+        forum_channel.send("Connected")
 
+    # Assuming active_threads attribute or similar method is available to list threads.
+    # This might need adjustment based on the discord.py version or fork you're using.
+    threads = await forum_channel.threads()  # Adjust this based on the actual method to get threads
+    
+    for thread in threads:
+        if thread.name == post_title:
+            return thread  # Found the forum post (thread) by title
+
+    return None  # No matching forum post found
 
 @bot.event
 async def on_ready():
 
-    channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
-    #WARN TODO NOTE debug False here
-    if channel and False:
-        print("scanning channel")
-        await scan_channel_history(channel=channel)
-        print('scan complete')
+    forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
+    post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
+
+    #for cn in bot.get_all_channels():
+    #    print(cn.name)
+    thread = await find_forum_post_by_title(forum_channel_name, post_title)
+    if thread:
+        print(f"Found forum post: {thread.name} (ID: {thread.id})")
     else:
-        print("chan not found")
+        print("Forum post not found")
+
+
+    # channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
+    # for cn in bot.get_all_channels():
+    #     print(cn.name)
+    # if channel:
+    #     print(f"Channel Name: {channel.Name}" )
+    #     channel.send("Story Bot Online!")
+    
+    # else:
+    #     print(f"Channel: {channel_name} not found")
+
+    #WARN TODO NOTE debug False here
+    
+    # if channel and False:
+    #     print("scanning channel")
+    #     await scan_channel_history(channel=channel)
+    #     print('scan complete')
+    # else:
+    #     print("chan not found")
     print(f'Logged in as {bot.user.name}')
 
 
@@ -196,7 +245,7 @@ async def on_message(message):
             if last_message is not None: #send the starter message
             # Check if this user was the last one to send a message
                 if author_name == last_message[3]: 
-                    #raise Exception("You were the last one to contribute to the story.")
+                    raise Exception("You were the last one to contribute to the story.")
                     pass
             
 
@@ -204,7 +253,7 @@ async def on_message(message):
             insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
-            await construct_and_send_message(channel=channel)
+            await construct_and_send_message(channel=channel, message=message)
             await message.channel.send(view=MyView())
             # Add a reaction to indicate successful processing
             await message.add_reaction("✅")
