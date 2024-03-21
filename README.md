@@ -7,3 +7,14 @@ when working locally, you need an env.development file.
 when developing in docker or deploying ensure the docker file has ENVIRONMENT=DOCKER var.
 
 The web server can be run or not by setting the 'START_WEBSERVER' variable to true.
+
+The DATABASE_URL should follow the format recognized by SQLAlchemy, which generally looks like:
+
+dialect+driver://username:password@host/dbname
+
+Example variables for the supported Database providers:
+SQLite: sqlite:///./test.db (note the three slashes, indicating a relative file path)
+PostgreSQL: postgresql://user:password@localhost/dbname
+MySQL/MariaDB: mysql+pymysql://user:password@localhost/dbname (using pymysql as the driver)
+SQL Server: mssql+pyodbc://user:password@servername/dbname?driver=SQL+Server (assuming you're using pyodbc and have the SQL Server ODBC driver installed)
+I can't promise efficacy of the db providers outside of psql and sqlite, since those are the only ones I use.
