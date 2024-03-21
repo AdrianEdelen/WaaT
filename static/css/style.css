@@ -1,14 +1,62 @@
-.word:hover::after {
-    content: attr(data-author) " " attr(data-timestamp);
+/* .word:hover::after { */
+    /* content: attr(data-author) " " attr(data-timestamp); */
     /* Display the profile picture and timestamp on hover */
     /* You might need JavaScript to dynamically set the background-image to data-avatar */
-    display: block;
+    /* display: block;
     position: absolute;
     background-color: #fff;
     padding: 5px;
     border: 1px solid #000;
     white-space: nowrap;
+} */
+/*.word:hover::after {
+/*    content: attr(data-author) " • " attr(data-timestamp);
+/*    display: block;
+/*    position: absolute;
+/*    background-color: #2f3136; /* Dark background similar to `code` elements */
+/*    color: #FFFFFF; /* White text color */
+/*    padding: 5px 10px; /* Adjusted padding */
+/*    border-radius: 4px; /* Rounded corners */
+/*    border: 1px solid #61666d; /* Slightly lighter border color */
+/*    white-space: nowrap;
+/*    z-index: 100; /* Ensure it's above other content */
+/*    font-size: 0.9em; /* Slightly smaller font size */
+/*    line-height: 1.4em;
+/*    margin-top: 20px; /* Positioning offset from the word */
+/*    left: 150; /* Align with the start of the word */
+/*    transform: translateX(-50%); /* Center it horizontally relative to the word */
+/*    pointer-events: none; /* Prevent the tooltip from blocking mouse events */
+/*	background-image: var(--avatar-url);
+/*    background-size: cover; /* Cover the tooltip area */
+/*    /* Ensure there's enough space in the tooltip to display the image */
+/*}*/
+#dynamic-tooltip {
+    display: none; /* Initially hidden */
+    position: absolute;
+    background-color: #2f3136; /* Dark background */
+    color: #FFFFFF; /* White text */
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid #61666d;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    font-size: 0.9em;
+    line-height: 1.4em;
+    min-width: 120px; /* Ensure minimum size */
+    text-align: center;
 }
+
+/* Additional styles for content within the tooltip */
+#dynamic-tooltip img {
+    display: block;
+    margin: 0 auto 10px auto; /* Center image and add space below */
+    width: 50px; /* Adjust size as needed */
+    height: 50px; /* Adjust size as needed */
+    border-radius: 50%; /* Make the image circular */
+}
+
+
 * {
 	font-family: monospace, sans-serif;
 	margin: 0;

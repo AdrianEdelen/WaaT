@@ -39,21 +39,21 @@ _\/\\\////////\\\_______________________________________\/\\\__\/\\\____________
     </div>
     <div id="story"></div>
 
-   <script>
+    <script>
         function createWordElement(wordData) {
             const wordSpan = document.createElement('span');
             wordSpan.classList.add('word');
             wordSpan.textContent = wordData.word + " ";
-            
+
             // Adding data attributes or hidden elements for hover info
             wordSpan.setAttribute('data-author', wordData.author);
             wordSpan.setAttribute('data-timestamp', wordData.timestamp);
             wordSpan.setAttribute('data-avatar', wordData.avatar);
-    
+
             // Hover effect can be handled via CSS or additional JavaScript
             return wordSpan;
         }
-    
+
         // Example for loading initial words
         fetch('/story').then(response => response.json()).then(data => {
             const storyDiv = document.getElementById('story');
@@ -62,15 +62,57 @@ _\/\\\////////\\\_______________________________________\/\\\__\/\\\____________
                 storyDiv.appendChild(wordElement);
             });
         });
-    
+        //TODO: the ws port and url need to be set to env vars properly
         // WebSocket connection and updating with new words
-        var ws = new WebSocket('ws://localhost:8080/ws');
-        ws.onmessage = function(event) {
+        var ws = new WebSocket('ws://localhost:8082/ws');
+        ws.onmessage = function (event) {
             const wordData = JSON.parse(event.data);
             const storyDiv = document.getElementById('story');
             const wordElement = createWordElement(wordData);
             storyDiv.appendChild(wordElement);
         };
+
+        document.querySelectorAll('.word').forEach(word => {
+            word.addEventListener('mouseenter', function () {
+                // Assuming `data-avatar` holds the URL to the avatar image
+                const avatarUrl = this.getAttribute('data-avatar');
+                this.style.setProperty('--avatar-url', `url(${avatarUrl})`);
+            });
+        });
+
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const tooltipDiv = document.createElement('div');
+            tooltipDiv.setAttribute('id', 'dynamic-tooltip');
+            document.body.appendChild(tooltipDiv);
+
+            document.querySelectorAll('.word').forEach(wordSpan => {
+                wordSpan.addEventListener('mouseenter', e => {
+                    const author = e.target.getAttribute('data-author');
+                    const timestamp = e.target.getAttribute('data-timestamp');
+                    const avatar = e.target.getAttribute('data-avatar');
+
+                    // Set the tooltip content
+                    tooltipDiv.innerHTML = `<img src="${avatar}" alt="Avatar"><div>${author}<br>${timestamp}</div>`;
+                    tooltipDiv.style.display = 'block';
+
+                    // Position the tooltip near the wordSpan
+                    const rect = e.target.getBoundingClientRect();
+                    const left = rect.left + (rect.width / 2) - (tooltipDiv.offsetWidth / 2);
+                    const top = rect.top + window.scrollY - tooltipDiv.offsetHeight - 10; // Position above the word
+
+                    tooltipDiv.style.left = `${left}px`;
+                    tooltipDiv.style.top = `${top}px`;
+                });
+
+                wordSpan.addEventListener('mouseleave', () => {
+                    tooltipDiv.style.display = 'none'; // Hide the tooltip
+                });
+            });
+        });
+
+
     </script>
 
 </body>

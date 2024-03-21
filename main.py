@@ -4,14 +4,15 @@ import sqlite3
 import discord
 from discord.ext import commands
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import traceback
 import sys
 from aiohttp import web
 import json
-
+import random
 import asyncio
 #TODO: This is for dev only
+#TODO: setup dev env vars better
 debug = True
 channel_name = 'teststory'
 meta_channel_name = 'teststory-meta'
@@ -25,9 +26,15 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 #TODO: Get the entire user data, and store it in a table called users
 #TODO: we will still get the current data, (for new profile pics and stuff, but will link it to a given user)
-
-
-
+#TODO: if the only item in the message is a punctuation remove the leading space
+#TODO: only retrieve the needed words from db. as we add words its going to take longer and longer
+#TODO: switch to better db
+#TODO: get more user information and store it in user table
+#TODO: clean up code
+#TODO: show the meta message in the embed
+#TODO: parse words against a dictionary to find and stop common exploits like word smushing
+#TODO: create mapping objects (or use an orm) so I don't have to access indices of stuff
+#TODO: Settings class and settings table, this can enable things like debugs, bypasses, website, cooldown rules and times, etc
 
 def initialize_db():
     conn = sqlite3.connect(db)
@@ -93,15 +100,49 @@ def insert_word(word, user, timestamp, meta_message, avatar_url):
             INSERT INTO story (word, timestamp, user, createdOn, meta_message, avatar_url)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (word, timestamp, user, datetime.now(), meta_message, avatar_url))
+        id = cursor.lastrowid
         conn.commit()
     except sqlite3.IntegrityError:
         print(f'entry already exists:{word} {timestamp} {user}')
         pass
     finally:
         conn.close()
+        return id
+    
+
+def get_message_by_id(id):
+        conn = sqlite3.connect(db)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM story WHERE id = ?', (id, ))
+        message = cursor.fetchone()
+
+        if message:
+            print(f"Message Found {message}")
+        else:
+            print("Message not found with specified id")
+        conn.close()
+        return message
+    
 
 
 
+def update_message_word(new_value, record_id):
+    # Connect to the SQLite database
+    conn = sqlite3.connect(db)
+    cursor = conn.cursor()
+    
+    # Prepare the SQL query to update the record
+    sql = f'''UPDATE story
+              SET word = ?
+              WHERE id = ?'''
+    
+    # Execute the query
+    cursor.execute(sql, (new_value, record_id))
+    
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+    
 
 
 
@@ -130,19 +171,19 @@ def get_all_words_detailed():
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
     # Assuming 'user' contains the author name, and 'timestamp' is when the word was added
-    cursor.execute('SELECT word, user, timestamp, meta_message FROM story ORDER BY id ASC')
+    cursor.execute('SELECT word, user, timestamp, meta_message, avatar_url  FROM story ORDER BY id ASC')
     words_detailed = cursor.fetchall()
     conn.close()
     # Create a list of dictionaries, each containing the word and its details
     words_with_details = [
-        {"word": word, "author": user, "timestamp": timestamp, "meta_message": meta_message}
-        for word, user, timestamp, meta_message in words_detailed
+        {"word": word, "author": user, "timestamp": timestamp, "meta_message": meta_message, "avatar_url": avatar_url}
+        for word, user, timestamp, meta_message, avatar_url in words_detailed
     ]
     return words_with_details
 
 async def construct_and_send_message(channel, message):
     words = get_all_words()
-    story = ' '.join(words)
+    story = await join_words(words=words)
 
     last_message = get_last_message()
     
@@ -251,19 +292,53 @@ async def on_ready():
 
 
 class ButtonViews(discord.ui.View): 
-    def __init__(self, *, timeout: float | None = 180):
+    def __init__(self, *, timeout: float | None = 180, record_id):
         super().__init__(timeout=None)
+        self.record_id = record_id
 
         full_story_button = discord.ui.Button(label="View The Full Story", style=discord.ButtonStyle.link, url='https://story.deadbolt.info')
         self.add_item(full_story_button)
-    
+        self.add_item(CapitalButton(label="A→a", record_id=record_id))
 
     @discord.ui.button(label="Edit", style=discord.ButtonStyle.primary, emoji="⚠")
     async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("edit button", ephemeral=True)
+
     
+    
+class CapitalButton(discord.ui.Button):
+    def __init__(self, label, record_id, style=discord.ButtonStyle.primary, emoji=None):
+        super().__init__(label=label, style=style, custom_id=f"{label}_{record_id}", emoji=emoji)
+        self.record_id = record_id
 
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        print(f"Record ID: {self.record_id}")
+        message = get_message_by_id(self.record_id)
+        print(f"Converting word: {message[1]}")
+        completion_text = ""
+        try:
+            new_word = message[1].swapcase()
+            print(f"converted: {new_word}")
+            update_message_word(new_word, record_id=self.record_id )
+            completion_text = f"converted: {message[1]}"
+        except Exception as e:
+            print(e)
+            completion_text = f"Unable to convert {message[1]}"
+        finally:
+            await interaction.followup.send(completion_text, ephemeral=True)
 
+async def join_words(words):
+    words_with_spaces = ""
+    punctuation = {",", ".", ":", ";", "!", "?"}
+    for word in words:
+        if word in punctuation:
+            words_with_spaces += word
+        else:
+            if words_with_spaces:
+                words_with_spaces += " "
+            words_with_spaces += word
+    return words_with_spaces
 
 @bot.event
 async def on_message(message):
@@ -292,11 +367,22 @@ async def on_message(message):
             # Check if this user was the last one to send a message
                 if author_name == last_message[3] and not debug: 
                     raise Exception("You were the last one to contribute to the story.")
-                    pass
-            
+                
+                #checking that the previous message is old enough that the person read it.
+                #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
+                last_message_timestamp = datetime.fromisoformat(last_message[2])
+                random_seconds = random.randint(3, 5)
+                delta = timedelta(seconds=random_seconds)
+                new_timestamp = last_message_timestamp + delta
+                if new_timestamp >= datetime.now(timezone.utc): #plus a random number between 3and 5 seconds
+                    raise Exception("It has been too soon since the previous message. try again in a moment")
+
+                #TODO: also add a check for the time since a given users last message. will need a users table for that
+
+
 
             # Insert the word into the database
-            insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
+            record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
             await construct_and_send_message(channel=channel, message=message)
@@ -304,11 +390,12 @@ async def on_message(message):
             embed = discord.Embed(
                description=f'{first_word}' 
             )
+            embed.set_footer(text=record_id)
             embed.set_thumbnail(url=avatar)
-            embed.set_author(name=author_name)
+            embed.set_author(name=f"{author_name} Said:")
             #await delete_last_message(message.channel)
             await message.channel.send(embed=embed)
-            await message.channel.send(view=ButtonViews())
+            await message.channel.send(view=ButtonViews(record_id=record_id))
             await message.add_reaction("✅")
             await message.delete()
             message.channel
@@ -343,7 +430,7 @@ async def websocket_handler(request):
 async def broadcast_new_word(word, user, timestamp, meta_message, avatar):
     # Construct the message to send to WebSocket clients
     #message = {'word': word}
-    message = {"word": word, "author": user, "timestamp": str(timestamp), "avatar": avatar, "meta": meta_message}
+    message = {"word": word, "author": user, "timestamp": str(timestamp), "avatar_url": avatar, "meta_message": meta_message}
 
     dead_websockets = []
     for ws in websockets:
@@ -397,9 +484,9 @@ async def start_web_server_and_bot():
     app.router.add_get('/ws', websocket_handler)  # WebSocket route
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8081)  # Listen on localhost:8080
+    site = web.TCPSite(runner, 'localhost', 8082)  # Listen on localhost:8080
     await site.start()
-    print('Web server running at localhost 8080')
+    print('Web server running at localhost 8081')
     await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
 
 def main():
