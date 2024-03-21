@@ -318,7 +318,7 @@ class CapitalButton(discord.ui.Button):
         print(f"Converting word: {message[1]}")
         completion_text = ""
         try:
-            new_word = message[1].swapcase()
+            new_word = message[1][0].swapcase()
             print(f"converted: {new_word}")
             update_message_word(new_word, record_id=self.record_id )
             completion_text = f"converted: {message[1]}"
