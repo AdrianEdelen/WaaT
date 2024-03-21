@@ -345,7 +345,6 @@ def main():
     logger.debug("Logger Started")
 
 
-
     #load settings
     logger.debug("Checking Environment")
     if not Settings.running_in_docker():
