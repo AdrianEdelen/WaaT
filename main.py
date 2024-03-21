@@ -11,13 +11,18 @@ from aiohttp import web
 import json
 import random
 import asyncio
+
+import Settings
+import database
+import Webserver
+import logging
+
 #TODO: This is for dev only
 #TODO: setup dev env vars better
 debug = True
 channel_name = 'teststory'
 meta_channel_name = 'teststory-meta'
 guild_id = 936034644166598757
-db = 'test1.db'
 websockets = []  # Global list to keep track of WebSocket connections
 intents = discord.Intents.default()
 intents.message_content = True
@@ -36,150 +41,19 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 #TODO: create mapping objects (or use an orm) so I don't have to access indices of stuff
 #TODO: Settings class and settings table, this can enable things like debugs, bypasses, website, cooldown rules and times, etc
 
-def initialize_db():
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS story (
-            id INTEGER PRIMARY KEY,
-            word TEXT,
-            timestamp DATETIME,
-            user TEXT,
-            createdOn DATETIME,
-            meta_message TEXT,
-            avatar_url
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bot_last_message (
-            channel_id INTEGER PRIMARY KEY,
-            message_id INTEGER
-        )
-    ''')
-                   
-    conn.commit()
-    conn.close()
 
 
 
-def save_last_message(channel_id, message_id):
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO bot_last_message (channel_id, message_id)
-        VALUES (?, ?)
-        ON CONFLICT(channel_id) DO UPDATE SET message_id = excluded.message_id;
-    ''', (channel_id, message_id))
-    conn.commit()
-    conn.close()
+#how does this work?
+async def delete_last_message(self, channel):
+        last_message_id = self.get_last_bot_message(channel.id)
+        if last_message_id:
+            try:
+                msg = await channel.fetch_message(last_message_id)
+                await msg.delete()
+            except Exception as e:
+                print(f"Failed to delete message: {e}")
 
-def get_last_bot_message(channel_id):
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT message_id FROM bot_last_message WHERE channel_id = ?', (channel_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return row[0] if row else None
-
-async def delete_last_message(channel):
-    last_message_id = get_last_bot_message(channel.id)
-    if last_message_id:
-        try:
-            msg = await channel.fetch_message(last_message_id)
-            await msg.delete()
-        except Exception as e:
-            print(f"Failed to delete message: {e}")
-
-
-def insert_word(word, user, timestamp, meta_message, avatar_url):
-
-    conn = sqlite3.connect(db)
-    try:
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO story (word, timestamp, user, createdOn, meta_message, avatar_url)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (word, timestamp, user, datetime.now(), meta_message, avatar_url))
-        id = cursor.lastrowid
-        conn.commit()
-    except sqlite3.IntegrityError:
-        print(f'entry already exists:{word} {timestamp} {user}')
-        pass
-    finally:
-        conn.close()
-        return id
-    
-
-def get_message_by_id(id):
-        conn = sqlite3.connect(db)
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM story WHERE id = ?', (id, ))
-        message = cursor.fetchone()
-
-        if message:
-            print(f"Message Found {message}")
-        else:
-            print("Message not found with specified id")
-        conn.close()
-        return message
-    
-
-
-
-def update_message_word(new_value, record_id):
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    
-    # Prepare the SQL query to update the record
-    sql = f'''UPDATE story
-              SET word = ?
-              WHERE id = ?'''
-    
-    # Execute the query
-    cursor.execute(sql, (new_value, record_id))
-    
-    # Commit the changes and close the connection
-    conn.commit()
-    conn.close()
-    
-
-
-
-def get_last_message():
-    """Fetch all words from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM story ORDER BY id DESC LIMIT 1')
-    last_message = cursor.fetchone()
-    conn.close()
-    if last_message is None:
-        return None  # Handling case where there are no entries
-    return last_message  # Assuming each row contains a single word in the first column.
-
-def get_all_words():
-    """Fetch all words from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT word FROM story ORDER BY id ASC')
-    words = cursor.fetchall()
-    conn.close()
-    return [word[0] for word in words]  # Assuming each row contains a single word in the first column.
-
-def get_all_words_detailed():
-    """Fetch all words with details from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    # Assuming 'user' contains the author name, and 'timestamp' is when the word was added
-    cursor.execute('SELECT word, user, timestamp, meta_message, avatar_url  FROM story ORDER BY id ASC')
-    words_detailed = cursor.fetchall()
-    conn.close()
-    # Create a list of dictionaries, each containing the word and its details
-    words_with_details = [
-        {"word": word, "author": user, "timestamp": timestamp, "meta_message": meta_message, "avatar_url": avatar_url}
-        for word, user, timestamp, meta_message, avatar_url in words_detailed
-    ]
-    return words_with_details
 
 async def construct_and_send_message(channel, message):
     words = get_all_words()
@@ -448,8 +322,6 @@ async def handle_story(request):
     return web.FileResponse('index.html')
     return web.Response(text=story, content_type='text/html')
 
-async def root_handler(request):
-    raise web.HTTPFound('/static/index.html')
 
 
 async def Process_Existing_story(request):
@@ -457,45 +329,45 @@ async def Process_Existing_story(request):
     
     pass
 
-async def audit_handler(request):
-    return web.FileResponse('./static/audit.html')
-
-async def fetch_next_message(request):
-    pass
-
-async def process_response(request):
-    data = await request.json()
-    action = data.get('action')
-    #process
-    return web.json_response({"status": "success"})
-
-async def start_web_server_and_bot():
+async def start_services():
     
-    app = web.Application()
-    app['websockets'] = [] # List to keep track of WebSocket connections
-    app.router.add_get('/', root_handler)
-    app.router.add_get('/audit', audit_handler)
-    app.router.add_get('/audit/next', fetch_next_message)
-    app.router.add_post('/audit/action', process_response)
-    app.router.add_static('/static/', path='static', name='static')
-    #app.router.add_get('/', handle_story)  # Existing story handler
-    app.router.add_get('/story', handle_story)
+    web_server = Webserver()
+    print(f"Web Server Started at {web_server.host}{web_server.port}")
 
-    app.router.add_get('/ws', websocket_handler)  # WebSocket route
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8082)  # Listen on localhost:8080
-    await site.start()
-    print('Web server running at localhost 8081')
     await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
 
 def main():
-    initialize_db()
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_web_server_and_bot())
+
+    #logger setup
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s() - %(lineno)d')
+    logger = logging.getLogger(__name__)
+    logger.debug("Logger Started")
+
+
+
+    #load settings
+    logger.debug("Checking Environment")
+    if not Settings.running_in_docker():
+        logger.info("Running in local environment")
+        #load dotenv
+        pass
     
-
-
+    #db setup
+    db = database.sqlite_db('test1.db')
+    db.initialize_db()
+    
+    #main event loop and starting of services
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_services())
+    
 
 if __name__ == '__main__':
     main()
+
+
+    # DEBUG=10.
+    # INFO=20.
+    # WARN=30.
+    # ERROR=40.
+    # CRITICAL=50.
