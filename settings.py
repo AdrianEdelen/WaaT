@@ -1,20 +1,30 @@
 import json
 import os
 import logging
+import dotenv
+import sys
 
-def running_in_docker():
-    logger = logging.getLogger(__name__)
+def load_env_specific_env():
+    try:
+        logger = logging.getLogger(__name__)
+        environment = os.getenv('ENVIRONMENT', 'development').lower()
+        logger.debug(f"Environment is {environment}")
+        if environment == "docker":
+            logger.debug(f"Environment '{environment}' nothing else to do with dotenv ")
+            return
+        dotenv_path = f'.env.{environment}'
+        logging.debug(f"dotenv_path = {dotenv_path}")
+        if os.path.isfile(dotenv_path):
+            result = dotenv.load_dotenv(dotenv_path=dotenv_path)
+            logger.debug(f"Attempted to load env variables from .env file. Result: {result}")
+            if not result:
+                raise EnvironmentError
+        else:
+            dotenv.load_dotenv()
+    except Exception as e:
+        logger.exception("Failed to properly load environment variables, stuff won't work")
+        sys.exit(1)
 
-    docker_var = "IN_DOCKER"
-    true_text = "true"
-    
-    logger.debug(f"Checking {docker_var} for {true_text}")
-    if os.getenv(docker_var) == true_text:
-        logger.debug(f"{docker_var} = True")
-        return True
-    else:
-        logger.debug(f"{docker_var} is not True") 
-        return False
 
 
 class Settings:

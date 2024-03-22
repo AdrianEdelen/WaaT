@@ -1,14 +1,11 @@
 
 
-import sqlite3
+import os
 import discord
 from discord.ext import commands
-import sqlite3
 from datetime import datetime, timedelta, timezone
 import traceback
-import sys
 from aiohttp import web
-import json
 import random
 import asyncio
 
@@ -218,71 +215,75 @@ async def join_words(words):
 async def on_message(message):
     channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
 
-    try:
-        if message.author == bot.user or message.channel.name != channel_name:
-            return
+    a = True
 
-        # Extract the first word from the message
-        message_parts = message.content.split(maxsplit=1)  # Split the message into two parts at most
-        first_word = message_parts[0] if message_parts else None  # First word is the first part
-        rest_of_message = message_parts[1] if len(message_parts) > 1 else ""  # Rest of the message is the second part, if it exists
 
-        avatar = None
-        if first_word:  # Proceed if there's at least one word in the message
-            author_id = message.author.id
-            author_name = message.author.display_name
-            timestamp = message.created_at
-            if message.author.avatar:
-                avatar = message.author.avatar.url
-            else:
-                avatar = ''
-            last_message = get_last_message()
-            if last_message is not None: #send the starter message
-            # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not debug: 
-                    raise Exception("You were the last one to contribute to the story.")
+
+    # try:
+    #     if message.author == bot.user or message.channel.name != channel_name:
+    #         return
+
+    #     # Extract the first word from the message
+    #     message_parts = message.content.split(maxsplit=1)  # Split the message into two parts at most
+    #     first_word = message_parts[0] if message_parts else None  # First word is the first part
+    #     rest_of_message = message_parts[1] if len(message_parts) > 1 else ""  # Rest of the message is the second part, if it exists
+
+    #     avatar = None
+    #     if first_word:  # Proceed if there's at least one word in the message
+    #         author_id = message.author.id
+    #         author_name = message.author.display_name
+    #         timestamp = message.created_at
+    #         if message.author.avatar:
+    #             avatar = message.author.avatar.url
+    #         else:
+    #             avatar = ''
+    #         last_message = get_last_message()
+    #         if last_message is not None: #send the starter message
+    #         # Check if this user was the last one to send a message
+    #             if author_name == last_message[3] and not debug: 
+    #                 raise Exception("You were the last one to contribute to the story.")
                 
-                #checking that the previous message is old enough that the person read it.
-                #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
-                last_message_timestamp = datetime.fromisoformat(last_message[2])
-                random_seconds = random.randint(3, 5)
-                delta = timedelta(seconds=random_seconds)
-                new_timestamp = last_message_timestamp + delta
-                if new_timestamp >= datetime.now(timezone.utc): #plus a random number between 3and 5 seconds
-                    raise Exception("It has been too soon since the previous message. try again in a moment")
+    #             #checking that the previous message is old enough that the person read it.
+    #             #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
+    #             last_message_timestamp = datetime.fromisoformat(last_message[2])
+    #             random_seconds = random.randint(3, 5)
+    #             delta = timedelta(seconds=random_seconds)
+    #             new_timestamp = last_message_timestamp + delta
+    #             if new_timestamp >= datetime.now(timezone.utc): #plus a random number between 3and 5 seconds
+    #                 raise Exception("It has been too soon since the previous message. try again in a moment")
 
-                #TODO: also add a check for the time since a given users last message. will need a users table for that
+    #             #TODO: also add a check for the time since a given users last message. will need a users table for that
 
 
 
-            # Insert the word into the database
-            record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
-            await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
-            # After processing, construct and send the updated story
-            await construct_and_send_message(channel=channel, message=message)
+    #         # Insert the word into the database
+    #         record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
+    #         await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
+    #         # After processing, construct and send the updated story
+    #         await construct_and_send_message(channel=channel, message=message)
 
-            embed = discord.Embed(
-               description=f'{first_word}' 
-            )
-            embed.set_footer(text=record_id)
-            embed.set_thumbnail(url=avatar)
-            embed.set_author(name=f"{author_name} Said:")
-            #await delete_last_message(message.channel)
-            await message.channel.send(embed=embed)
-            await message.channel.send(view=ButtonViews(record_id=record_id))
-            await message.add_reaction("✅")
-            await message.delete()
-            message.channel
-            #await save_last_message(channel_id=message.channel.id, message_id=message.id)
+    #         embed = discord.Embed(
+    #            description=f'{first_word}' 
+    #         )
+    #         embed.set_footer(text=record_id)
+    #         embed.set_thumbnail(url=avatar)
+    #         embed.set_author(name=f"{author_name} Said:")
+    #         #await delete_last_message(message.channel)
+    #         await message.channel.send(embed=embed)
+    #         await message.channel.send(view=ButtonViews(record_id=record_id))
+    #         await message.add_reaction("✅")
+    #         await message.delete()
+    #         message.channel
+    #         #await save_last_message(channel_id=message.channel.id, message_id=message.id)
 
-    except Exception as e:
-        print(e)
-        print(traceback.format_exc())
-        # Send a message and reaction when it fails
-        await message.channel.send(str(e))
-        if debug:
-            await message.channel.send(str(traceback.format_exc()))
-        await message.add_reaction("❌")
+    # except Exception as e:
+    #     print(e)
+    #     print(traceback.format_exc())
+    #     # Send a message and reaction when it fails
+    #     await message.channel.send(str(e))
+    #     if debug:
+    #         await message.channel.send(str(traceback.format_exc()))
+    #     await message.add_reaction("❌")
 
 
 
@@ -315,23 +316,39 @@ async def broadcast_new_word(word, user, timestamp, meta_message, avatar):
     for ws in dead_websockets:
         websockets.remove(ws)
 
-async def handle_story(request):
-    words_with_details = get_all_words_detailed()
-    return web.json_response(words_with_details)
-    story = ' '.join(words)
-    return web.FileResponse('index.html')
-    return web.Response(text=story, content_type='text/html')
+#----------------------------
+# from sqlalchemy.orm import Session
+# from database import SessionLocal, engine
+# from models import Base, User, Word
 
+# # Create database tables
+# Base.metadata.create_all(bind=engine)
 
+# # Start a session
+# db = SessionLocal()
+# db.User
+# # Create a new user
+# new_user = User(name='John Doe', email='john@example.com')
+# db.add(new_user)
+# db.commit()
 
-async def Process_Existing_story(request):
-    
-    
-    pass
+# # Add a new word associated with the user
+# new_word = Word(content='Hello', user_id=new_user.id)
+# db.add(new_word)
+# db.commit()
+
+# # Alternatively, you can add words using the relationship
+# new_user.words.append(Word(content='World'))
+# db.commit()
+#------------------------------
+
 
 async def start_services():
     
-    web_server = Webserver()
+    WEBSERVER_URL = os.getenv("WEBSERVER_URL")
+    WEBSERVER_PORT = os.getenv("WEBSERVER_PORT")
+    web_server = Webserver.Webserver(WEBSERVER_URL, WEBSERVER_PORT)
+    await web_server.start()
     print(f"Web Server Started at {web_server.host}{web_server.port}")
 
     await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
@@ -342,21 +359,23 @@ def main():
     logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s() - %(lineno)d')
     logger = logging.getLogger(__name__)
+    logger.level = logging.DEBUG
     logger.debug("Logger Started")
 
 
-    #load settings
-    logger.debug("Checking Environment")
-    if not Settings.running_in_docker():
-        logger.info("Running in local environment")
-        #load dotenv
-        pass
-    
+    #load Environment variables
+    logger.debug("Loading Env Vars")
+    Settings.load_env_specific_env()
+
     #db setup
-    db = database.sqlite_db('test1.db')
-    db.initialize_db()
-    
+    logger.debug("Initializing Database")
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    database.init_database(DATABASE_URL)
+    from models import User, Word    
+
+
     #main event loop and starting of services
+    logger.debug("Starting Event Loop")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_services())
     
