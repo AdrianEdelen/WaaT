@@ -20,3 +20,15 @@ The DATABASE_URL should follow the format recognized by SQLAlchemy, which genera
 
 
 I can't promise efficacy of the db providers outside of psql and sqlite, since those are the only ones I use. I am using SQLAlchemy so they should work.
+example .env.development file:
+DEBUG=true
+CHANNEL_NAME=Test
+META_CHANNEL_NAME=Test-Meta
+GUILD_ID=54564645646464
+DATABASE_URL=test.db
+BOT_COMMAND_PREFIX=!
+DISCORD_API_KEY=APIKEY
+DATABASE=sqlite
+DATABASE_URL=sqlite:///./test.db
+WEBSERVER_URL=localhost
+WEBSERVER_PORT=8080
