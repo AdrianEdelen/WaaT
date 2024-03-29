@@ -10,14 +10,18 @@ import random
 import asyncio
 
 import Settings
-import database
+from database import Database
 import Webserver
 import logging
+import sys
+
+
+from models import User, One_Word_Message
 
 #TODO: This is for dev only
 #TODO: setup dev env vars better
 debug = True
-channel_name = 'teststory'
+one_word_channel_name = 'teststory'
 meta_channel_name = 'teststory-meta'
 guild_id = 936034644166598757
 websockets = []  # Global list to keep track of WebSocket connections
@@ -59,7 +63,7 @@ async def construct_and_send_message(channel, message):
     last_message = get_last_message()
     
     if last_message:
-        last_word_note = f"Last word added by {last_message[3]}: {last_message[1]}"  # Adjusted to fetch the correct indices
+        last_word_note = f"Last word added by {last_message[3]}: {last_message[1]}"  
     else:
         last_word_note = "No contributions yet!"
     if last_message[5] != "":
@@ -67,11 +71,11 @@ async def construct_and_send_message(channel, message):
     
     # Discord's character limit
     char_limit = 2000
-    print(f'story length{len(story)}')
+    print(f'story length: {len(story)}')
 
     if len(story) > char_limit:
         # Truncate story from the beginning to fit within limit
-        # Note: This simple truncation may cut off a word partially; you may need more logic for cleanly cutting off.
+        # Note: This simple truncation may cut off a word partially;
         print('truncating message')
         story = '...' + story[-(char_limit-3):]
     print(f'sending a message that is {len(story)} characters long')
@@ -79,13 +83,9 @@ async def construct_and_send_message(channel, message):
 
 
 async def scan_channel_history(channel):
-    # Assumes `channel` is a discord.TextChannel object
-    # We use `oldest_first=True` to start from the beginning of the channel.
     oldest_message_id = None
     async for message in channel.history(limit=None, oldest_first=True):
-        # Process each message
-        # This is where you'd extract the last word and store it along with the user and timestamp.
-        # For demonstration, we're just printing the message content.
+       
         print(f"{message.author}: {message.content}")
         insert_word(str(message.author.id), message.content, message.created_at)
         oldest_message_id = message.id
@@ -129,37 +129,21 @@ async def on_ready():
     if debug:
         print("Debug mode on, do not use in production, fr")
         
-    forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
-    post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
 
-    #for cn in bot.get_all_channels():
-    #    print(cn.name)
+    forum_channel_name = 'hobbies-and-misc' 
+    post_title = 'Word at a Time Story'  
+
+    #TODO: why doesn't this seem to work?
     thread = await find_forum_post_by_title(forum_channel_name, post_title)
     if thread:
         print(f"Found forum post: {thread.name} (ID: {thread.id})")
     else:
         print("Forum post not found")
 
-
-    # channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
-    # for cn in bot.get_all_channels():
-    #     print(cn.name)
-    # if channel:
-    #     print(f"Channel Name: {channel.Name}" )
-    #     channel.send("Story Bot Online!")
-    
-    # else:
-    #     print(f"Channel: {channel_name} not found")
-
-    #WARN TODO NOTE debug False here
-    
-    # if channel and False:
-    #     print("scanning channel")
-    #     await scan_channel_history(channel=channel)
-    #     print('scan complete')
-    # else:
-    #     print("chan not found")
     print(f'Logged in as {bot.user.name}')
+
+
+
 
 
 class ButtonViews(discord.ui.View): 
@@ -213,77 +197,51 @@ async def join_words(words):
 
 @bot.event
 async def on_message(message):
-    channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
+    channel = discord.utils.get(bot.get_all_channels(), name=one_word_channel_name)
+    logger = logging.getLogger(__name__)
+    logger.debug(f"On Message: {message.channel.name}")
 
-    a = True
+
+    with get_db() as db:
+
+        try:
+            if message.author == bot.user:
+                logger.debug("Message is made by bot exiting message processor")
+                #TODO: is there anything we want to do with bot messages?
+                return
 
 
+            author_id = message.author.id
+            user = db.query(User).filter(User.discord_user_id == author_id).first()
+            if user is None:
+                if message.author.avatar:
+                        avatar = message.author.avatar.url
+                else:
+                    avatar = ''
+                user = User(discord_user_id=author_id, display_name=message.author.display_name, username=message.author.name, current_avatar_url=avatar)
+                db.add(user)
+                db.commit()
+                db.refresh(user)
 
-    # try:
-    #     if message.author == bot.user or message.channel.name != channel_name:
-    #         return
+            #TODO: this assumes channel_name is the one word story, we want to be more specific here
+            #TODO: this handler handles every message sent to the server so it will do other stuff.
+            if message.channel.name != one_word_channel_name:
+                logger.debug("Message is not One Word Story")
 
-    #     # Extract the first word from the message
-    #     message_parts = message.content.split(maxsplit=1)  # Split the message into two parts at most
-    #     first_word = message_parts[0] if message_parts else None  # First word is the first part
-    #     rest_of_message = message_parts[1] if len(message_parts) > 1 else ""  # Rest of the message is the second part, if it exists
-
-    #     avatar = None
-    #     if first_word:  # Proceed if there's at least one word in the message
-    #         author_id = message.author.id
-    #         author_name = message.author.display_name
-    #         timestamp = message.created_at
-    #         if message.author.avatar:
-    #             avatar = message.author.avatar.url
-    #         else:
-    #             avatar = ''
-    #         last_message = get_last_message()
-    #         if last_message is not None: #send the starter message
-    #         # Check if this user was the last one to send a message
-    #             if author_name == last_message[3] and not debug: 
-    #                 raise Exception("You were the last one to contribute to the story.")
+                return
+            if (message.channel.name == one_word_channel_name):
+                logger.info("Message is a one word story message, processing...")
+                await process_one_word_story_message(logger, db, message)
                 
-    #             #checking that the previous message is old enough that the person read it.
-    #             #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
-    #             last_message_timestamp = datetime.fromisoformat(last_message[2])
-    #             random_seconds = random.randint(3, 5)
-    #             delta = timedelta(seconds=random_seconds)
-    #             new_timestamp = last_message_timestamp + delta
-    #             if new_timestamp >= datetime.now(timezone.utc): #plus a random number between 3and 5 seconds
-    #                 raise Exception("It has been too soon since the previous message. try again in a moment")
 
-    #             #TODO: also add a check for the time since a given users last message. will need a users table for that
-
-
-
-    #         # Insert the word into the database
-    #         record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
-    #         await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
-    #         # After processing, construct and send the updated story
-    #         await construct_and_send_message(channel=channel, message=message)
-
-    #         embed = discord.Embed(
-    #            description=f'{first_word}' 
-    #         )
-    #         embed.set_footer(text=record_id)
-    #         embed.set_thumbnail(url=avatar)
-    #         embed.set_author(name=f"{author_name} Said:")
-    #         #await delete_last_message(message.channel)
-    #         await message.channel.send(embed=embed)
-    #         await message.channel.send(view=ButtonViews(record_id=record_id))
-    #         await message.add_reaction("✅")
-    #         await message.delete()
-    #         message.channel
-    #         #await save_last_message(channel_id=message.channel.id, message_id=message.id)
-
-    # except Exception as e:
-    #     print(e)
-    #     print(traceback.format_exc())
-    #     # Send a message and reaction when it fails
-    #     await message.channel.send(str(e))
-    #     if debug:
-    #         await message.channel.send(str(traceback.format_exc()))
-    #     await message.add_reaction("❌")
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            # Send a message and reaction when it fails
+            await message.channel.send(str(e))
+            if debug:
+                await message.channel.send(str(traceback.format_exc()))
+            await message.add_reaction("❌")
 
 
 
@@ -341,7 +299,11 @@ async def broadcast_new_word(word, user, timestamp, meta_message, avatar):
 # new_user.words.append(Word(content='World'))
 # db.commit()
 #------------------------------
-
+def get_db():
+    database_url = os.getenv("DATABASE_URL")
+    db_instance = Database.get_instance(database_url=database_url)
+    return db_instance.SessionLocal()
+    
 
 async def start_services():
     
@@ -351,34 +313,46 @@ async def start_services():
     await web_server.start()
     print(f"Web Server Started at {web_server.host}{web_server.port}")
 
-    await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
+    DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
+    await bot.start(DISCORD_API_KEY)
 
 def main():
 
-    #logger setup
+    #-----------------Logger Setup-----------------
     logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(funcName)s() - %(lineno)d')
     logger = logging.getLogger(__name__)
     logger.level = logging.DEBUG
     logger.debug("Logger Started")
+    #----------------------------------------------
 
 
-    #load Environment variables
+
+    #-----------------Environment Var Setup-----------------
     logger.debug("Loading Env Vars")
     Settings.load_env_specific_env()
-
-    #db setup
-    logger.debug("Initializing Database")
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    database.init_database(DATABASE_URL)
-    from models import User, Word    
+    #-------------------------------------------------------
 
 
-    #main event loop and starting of services
+
+    #-----------------Database Setup-----------------
+    # logger.debug("Initializing Database")
+    # DATABASE_URL = os.getenv("DATABASE_URL")
+    # db = Database(DATABASE_URL)
+    # if db.init_database(DATABASE_URL):
+    #     logger.info("Connected to DB")
+    # else:
+    #     logger.critical("Unable to connect to db")
+    #     sys.exit(1)
+    #------------------------------------------------
+ 
+
+
+    #-----------------Main Loop and Start Services-----------------
     logger.debug("Starting Event Loop")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_services())
-    
+    #--------------------------------------------------------------
 
 if __name__ == '__main__':
     main()
