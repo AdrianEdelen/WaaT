@@ -11,6 +11,7 @@ from aiohttp import web
 import json
 import random
 import asyncio
+import os
 #TODO: This is for dev only
 #TODO: setup dev env vars better
 debug = False
@@ -508,7 +509,6 @@ def main():
     loop.run_until_complete(start_web_server_and_bot())
     
 
-import os
 
 if __name__ == '__main__':
     
