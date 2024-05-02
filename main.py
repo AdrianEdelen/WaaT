@@ -18,7 +18,7 @@ debug = False
 
 test = False
 run_web_server = False
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 if test:
     channel_name = 'teststory'
