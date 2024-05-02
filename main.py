@@ -508,7 +508,10 @@ def main():
     loop.run_until_complete(start_web_server_and_bot())
     
 
-
+import os
 
 if __name__ == '__main__':
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    DB_PATH = os.getenv('DATABASE_PATH', 'live.db')
+
     main()
