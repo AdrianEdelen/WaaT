@@ -20,8 +20,8 @@ test = False
 run_web_server = False
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
-
-if test:
+TEST = os.getenv("TEST", False)
+if TEST:
     channel_name = 'teststory'
     meta_channel_name = 'teststory-meta'
     db = '/data/test.db'
@@ -29,6 +29,16 @@ else:
     channel_name = 'Word at a Time Story'
     meta_channel_name = 'Word at a time meta'
     db = '/data/live.db'
+
+# Define a base directory
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Path for the database
+db_path = os.path.join(base_dir, 'data', 'live.db')
+db_dir = os.path.dirname(db_path)
+
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
 
 
 guild_id = GUILD_ID
@@ -74,8 +84,6 @@ def initialize_db():
     conn.commit()
     conn.close()
 
-
-
 def save_last_message(channel_id, message_id):
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
@@ -104,7 +112,6 @@ async def delete_last_message(channel):
         except Exception as e:
             print(f"Failed to delete message: {e}")
 
-
 def insert_word(word, user, timestamp, meta_message, avatar_url):
 
     conn = sqlite3.connect(db)
@@ -123,7 +130,6 @@ def insert_word(word, user, timestamp, meta_message, avatar_url):
         conn.close()
         return id
     
-
 def get_message_by_id(id):
         conn = sqlite3.connect(db)
         cursor = conn.cursor()
@@ -137,9 +143,6 @@ def get_message_by_id(id):
         conn.close()
         return message
     
-
-
-
 def update_message_word(new_value, record_id):
     # Connect to the SQLite database
     conn = sqlite3.connect(db)
@@ -157,9 +160,6 @@ def update_message_word(new_value, record_id):
     conn.commit()
     conn.close()
     
-
-
-
 def get_last_message():
     """Fetch all words from the database, ordered by their position in the story."""
     conn = sqlite3.connect(db)
@@ -220,7 +220,6 @@ async def construct_and_send_message(channel, message):
     print(f'sending a message that is {len(story)} characters long')
     await message.channel.send(story)
 
-
 async def scan_channel_history(channel):
     # Assumes `channel` is a discord.TextChannel object
     # We use `oldest_first=True` to start from the beginning of the channel.
@@ -237,7 +236,6 @@ async def scan_channel_history(channel):
         print(f"Finished scanning. Oldest message ID: {oldest_message_id}")
     else:
         print("No messages found.")
-
 
 async def find_forum_post_by_title(forum_channel_name, post_title):
     guild = bot.get_guild(guild_id)
@@ -304,7 +302,6 @@ async def on_ready():
     #     print("chan not found")
     print(f'Logged in as {bot.user.name}')
 
-
 class ButtonViews(discord.ui.View): 
     def __init__(self, *, timeout: float | None = 180, record_id):
         super().__init__(timeout=None)
@@ -317,8 +314,6 @@ class ButtonViews(discord.ui.View):
     @discord.ui.button(label="Edit", style=discord.ButtonStyle.primary, emoji="⚠")
     async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("edit button", ephemeral=True)
-
-    
     
 class CapitalButton(discord.ui.Button):
     def __init__(self, label, record_id, style=discord.ButtonStyle.primary, emoji=None):
@@ -425,8 +420,6 @@ async def on_message(message):
             await message.channel.send(str(traceback.format_exc()))
         await message.add_reaction("❌")
 
-
-
 async def websocket_handler(request):
     ws = web.WebSocketResponse()
     await ws.prepare(request)
@@ -465,7 +458,6 @@ async def handle_story(request):
 
 async def root_handler(request):
     raise web.HTTPFound('/static/index.html')
-
 
 async def Process_Existing_story(request):
     
@@ -509,8 +501,6 @@ def main():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_web_server_and_bot())
     
-
-
 if __name__ == '__main__':
     
 
