@@ -26,7 +26,7 @@ if test:
 else:
     channel_name = 'Word at a Time Story'
     meta_channel_name = 'Word at a time meta'
-    db = 'live.db'
+    db = './live.db'
 
 
 guild_id = 936034644166598757
