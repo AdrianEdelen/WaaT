@@ -1,27 +1,26 @@
 <?xml version="1.0"?>
-<Container>
-  <Name>My Discord Bot</Name>
+<Container version="2">
+  <Name>BallboiNew</Name>
   <Repository>adrianedelen/ballboinew:latest</Repository>
   <Registry>https://hub.docker.com/r/adrianedelen/ballboinew</Registry>
   <Network>bridge</Network>
+  <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-    <Environment>
-        <Variable>
-            <Name>DISCORD_BOT_TOKEN</Name>
-            <Value></Value>
-            <Mode></Mode>
-            <Description>Discord bot token.</Description>
-            <Required>true</Required>
-            <Mask>false</Mask>
-        </Variable>
-    </Environment>
-    <Volumes>
-        <Volume>
-            <HostDir>/mnt/user/appdata/ballboinew/</HostDir>
-            <ContainerDir>/data</ContainerDir>
-            <Mode>rw</Mode>
-        </Volume>
-    </Volumes>
-
+  <Support/>
+  <Project/>
+  <Overview/>
+  <Category/>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon>https://cdn.discordapp.com/attachments/1085261989728768172/1235636064568479825/ballboi.webp?ex=66351742&amp;amp;is=6633c5c2&amp;amp;hm=0194f81021d884f2104488d4af0570172afa9f713f3a4cb22bb8cbc7e1789cd6&amp;amp;</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled>1714669063</DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="DISCORD_BOT_TOKEN" Target="DISCORD_BOT_TOKEN" Default="Discord API Key" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="bot data path" Target="/data" Default="/mnt/user/appdata/ballboinew" Mode="rw" Description="" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/ballboinew</Config>
 </Container>
