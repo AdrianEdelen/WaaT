@@ -18,4 +18,4 @@ ENV DISCORD_BOT_TOKEN=YourTokenHere
 VOLUME /data
 
 # Run the bot script when the container launches
-CMD ["python", "bot_script.py"]
+CMD ["python", "main.py"]
