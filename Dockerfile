@@ -13,7 +13,6 @@ COPY . .
 
 # Set environment variable defaults if not provided
 ENV DISCORD_BOT_TOKEN=YourTokenHere
-ENV DATABASE_PATH=/data/live.db
 
 # Expose volume for external database storage
 VOLUME /data

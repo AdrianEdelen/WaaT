@@ -1,34 +1,27 @@
 <?xml version="1.0"?>
 <Container>
   <Name>My Discord Bot</Name>
-  <Repository>yourusername/yourimage:latest</Repository>
-  <Registry>https://hub.docker.com/r/yourusername/yourimage</Registry>
+  <Repository>adrianedelen/ballboinew:latest</Repository>
+  <Registry>https://hub.docker.com/r/adrianedelen/ballboinew</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Environment>
-    <Variable>
-      <Name>DISCORD_TOKEN</Name>
-      <Value></Value>
-      <Mode></Mode>
-      <Description>Discord bot token.</Description>
-      <Required>true</Required>
-      <Mask>false</Mask>
-    </Variable>
-    <Variable>
-      <Name>DATABASE_PATH</Name>
-      <Value>/data/live.db</Value>
-      <Mode></Mode>
-      <Description>Path to the SQLite database file.</Description>
-      <Required>false</Required>
-      <Mask>false</Mask>
-    </Variable>
-  </Environment>
-  <Volumes>
-    <Volume>
-      <HostDir>/mnt/user/appdata/my-discord-bot/</HostDir>
-      <ContainerDir>/data</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-  </Volumes>
+    <Environment>
+        <Variable>
+            <Name>DISCORD_BOT_TOKEN</Name>
+            <Value></Value>
+            <Mode></Mode>
+            <Description>Discord bot token.</Description>
+            <Required>true</Required>
+            <Mask>false</Mask>
+        </Variable>
+    </Environment>
+    <Volumes>
+        <Volume>
+            <HostDir>/mnt/user/appdata/ballboinew/</HostDir>
+            <ContainerDir>/data</ContainerDir>
+            <Mode>rw</Mode>
+        </Volume>
+    </Volumes>
+
 </Container>

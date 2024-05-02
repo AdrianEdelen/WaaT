@@ -18,16 +18,15 @@ debug = False
 test = False
 run_web_server = False
 TOKEN = os.getenv("DISCORD_TOKEN")
-DB_PATH = os.getenv('DATABASE_PATH', 'live.db')
 
 if test:
     channel_name = 'teststory'
     meta_channel_name = 'teststory-meta'
-    db = 'test'
+    db = '/data/test.db'
 else:
     channel_name = 'Word at a Time Story'
     meta_channel_name = 'Word at a time meta'
-    db = DB_PATH
+    db = '/data/live.db'
 
 
 guild_id = 936034644166598757
