@@ -17,7 +17,8 @@ debug = False
 
 test = False
 run_web_server = False
-
+TOKEN = os.getenv("DISCORD_TOKEN")
+DB_PATH = os.getenv('DATABASE_PATH', 'live.db')
 
 if test:
     channel_name = 'teststory'
@@ -26,7 +27,7 @@ if test:
 else:
     channel_name = 'Word at a Time Story'
     meta_channel_name = 'Word at a time meta'
-    db = './live.db'
+    db = DB_PATH
 
 
 guild_id = 936034644166598757
@@ -500,7 +501,7 @@ async def start_web_server_and_bot():
         site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
         await site.start()
         print('Web server running at localhost 8080')
-    await bot.start('MTA4NTI2MjMzMDgxNzk0OTY5Ng.GlNGkW.e2B70gVpXuLh4TRYtjs1AbVvJ0ke5OBaaELf_E')
+    await bot.start(TOKEN)
 
 def main():
     initialize_db()
@@ -511,7 +512,6 @@ def main():
 import os
 
 if __name__ == '__main__':
-    TOKEN = os.getenv("DISCORD_TOKEN")
-    DB_PATH = os.getenv('DATABASE_PATH', 'live.db')
+    
 
     main()
