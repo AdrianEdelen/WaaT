@@ -22,5 +22,6 @@
   <DonateLink/>
   <Requires/>
   <Config Name="DISCORD_BOT_TOKEN" Target="DISCORD_BOT_TOKEN" Default="Discord API Key" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="Guild Id" Target="GUILD_ID" Default="Guild Id" Mode="" Description="" Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="bot data path" Target="/data" Default="/mnt/user/appdata/ballboinew" Mode="rw" Description="" Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/ballboinew</Config>
 </Container>

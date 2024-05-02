@@ -13,6 +13,7 @@ COPY . .
 
 # Set environment variable defaults if not provided
 ENV DISCORD_BOT_TOKEN=YourTokenHere
+ENV GUILD_ID=guildId
 
 # Expose volume for external database storage
 VOLUME /data

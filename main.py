@@ -19,6 +19,7 @@ debug = False
 test = False
 run_web_server = False
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+GUILD_ID = os.getenv("GUILD_ID")
 
 if test:
     channel_name = 'teststory'
@@ -30,7 +31,7 @@ else:
     db = '/data/live.db'
 
 
-guild_id = 936034644166598757
+guild_id = GUILD_ID
 websockets = []  # Global list to keep track of WebSocket connections
 intents = discord.Intents.default()
 intents.message_content = True
