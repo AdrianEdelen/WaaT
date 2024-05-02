@@ -457,9 +457,9 @@ async def broadcast_new_word(word, user, timestamp, meta_message, avatar):
 async def handle_story(request):
     words_with_details = get_all_words_detailed()
     return web.json_response(words_with_details)
-    story = ' '.join(words)
-    return web.FileResponse('index.html')
-    return web.Response(text=story, content_type='text/html')
+    # story = ' '.join(words)
+    # return web.FileResponse('index.html')
+    # return web.Response(text=story, content_type='text/html')
 
 async def root_handler(request):
     raise web.HTTPFound('/static/index.html')
