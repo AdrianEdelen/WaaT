@@ -465,23 +465,21 @@ async def process_response(request):
     return web.json_response({"status": "success"})
 
 async def start_web_server_and_bot():
-    if run_web_server:
-        app = web.Application()
-        app['websockets'] = [] # List to keep track of WebSocket connections
-        app.router.add_get('/', root_handler)
-        app.router.add_get('/audit', audit_handler)
-        app.router.add_get('/audit/next', fetch_next_message)
-        app.router.add_post('/audit/action', process_response)
-        app.router.add_static('/static/', path='static', name='static')
-        #app.router.add_get('/', handle_story)  # Existing story handler
-        app.router.add_get('/story', handle_story)
-
-        app.router.add_get('/ws', websocket_handler)  # WebSocket route
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
-        await site.start()
-        print('Web server running at localhost 8080')
+    app = web.Application()
+    app['websockets'] = [] # List to keep track of WebSocket connections
+    app.router.add_get('/', root_handler)
+    app.router.add_get('/audit', audit_handler)
+    app.router.add_get('/audit/next', fetch_next_message)
+    app.router.add_post('/audit/action', process_response)
+    app.router.add_static('/static/', path='static', name='static')
+    #app.router.add_get('/', handle_story)  # Existing story handler
+    app.router.add_get('/story', handle_story)
+    app.router.add_get('/ws', websocket_handler)  # WebSocket route
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
+    await site.start()
+    print('Web server running at localhost 8080')
     await bot.start(TOKEN)
 
 
