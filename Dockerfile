@@ -18,5 +18,7 @@ ENV GUILD_ID=guildId
 # Expose volume for external database storage
 VOLUME /data
 
+EXPOSE 8080
+
 # Run the bot script when the container launches
-CMD ["python", "main.py"]
+CMD ["python", "-m", "ballboi.main"]

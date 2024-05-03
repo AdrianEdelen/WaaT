@@ -1,5 +1,3 @@
-
-
 import sqlite3
 import discord
 from discord.ext import commands
@@ -12,23 +10,21 @@ import json
 import random
 import asyncio
 import os
-#TODO: This is for dev only
-#TODO: setup dev env vars better
-debug = False
+from utils.env_manager import EnvManager
 
-test = False
-run_web_server = False
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
+TEST = os.getenv("TEST", False)
 
-if test:
-    channel_name = 'teststory'
-    meta_channel_name = 'teststory-meta'
-    db = '/data/test.db'
-else:
-    channel_name = 'Word at a Time Story'
-    meta_channel_name = 'Word at a time meta'
-    db = '/data/live.db'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.dirname(current_dir)
+channel_name = 'Word at a Time Story'
+meta_channel_name = 'Word at a time meta'
+db = os.path.join(base_dir, 'data', 'live.db')
+
+db_dir = os.path.dirname(db)
+if not os.path.exists(db_dir):
+    os.makedirs(db_dir)
 
 
 guild_id = GUILD_ID
@@ -74,8 +70,6 @@ def initialize_db():
     conn.commit()
     conn.close()
 
-
-
 def save_last_message(channel_id, message_id):
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
@@ -104,7 +98,6 @@ async def delete_last_message(channel):
         except Exception as e:
             print(f"Failed to delete message: {e}")
 
-
 def insert_word(word, user, timestamp, meta_message, avatar_url):
 
     conn = sqlite3.connect(db)
@@ -123,7 +116,6 @@ def insert_word(word, user, timestamp, meta_message, avatar_url):
         conn.close()
         return id
     
-
 def get_message_by_id(id):
         conn = sqlite3.connect(db)
         cursor = conn.cursor()
@@ -137,9 +129,6 @@ def get_message_by_id(id):
         conn.close()
         return message
     
-
-
-
 def update_message_word(new_value, record_id):
     # Connect to the SQLite database
     conn = sqlite3.connect(db)
@@ -157,9 +146,6 @@ def update_message_word(new_value, record_id):
     conn.commit()
     conn.close()
     
-
-
-
 def get_last_message():
     """Fetch all words from the database, ordered by their position in the story."""
     conn = sqlite3.connect(db)
@@ -220,7 +206,6 @@ async def construct_and_send_message(channel, message):
     print(f'sending a message that is {len(story)} characters long')
     await message.channel.send(story)
 
-
 async def scan_channel_history(channel):
     # Assumes `channel` is a discord.TextChannel object
     # We use `oldest_first=True` to start from the beginning of the channel.
@@ -237,7 +222,6 @@ async def scan_channel_history(channel):
         print(f"Finished scanning. Oldest message ID: {oldest_message_id}")
     else:
         print("No messages found.")
-
 
 async def find_forum_post_by_title(forum_channel_name, post_title):
     guild = bot.get_guild(guild_id)
@@ -269,8 +253,8 @@ async def find_forum_post_by_title(forum_channel_name, post_title):
 
 @bot.event
 async def on_ready():
-    if debug:
-        print("Debug mode on, do not use in production, fr")
+    if TEST:
+        print("TEST mode on, do not use in production, fr")
         
     forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
     post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
@@ -304,7 +288,6 @@ async def on_ready():
     #     print("chan not found")
     print(f'Logged in as {bot.user.name}')
 
-
 class ButtonViews(discord.ui.View): 
     def __init__(self, *, timeout: float | None = 180, record_id):
         super().__init__(timeout=None)
@@ -317,8 +300,6 @@ class ButtonViews(discord.ui.View):
     @discord.ui.button(label="Edit", style=discord.ButtonStyle.primary, emoji="⚠")
     async def button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("edit button", ephemeral=True)
-
-    
     
 class CapitalButton(discord.ui.Button):
     def __init__(self, label, record_id, style=discord.ButtonStyle.primary, emoji=None):
@@ -380,7 +361,7 @@ async def on_message(message):
             last_message = get_last_message()
             if last_message is not None: #send the starter message
             # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not debug: 
+                if author_name == last_message[3] and not TEST: 
                     raise Exception("You were the last one to contribute to the story.")
                 
                 #checking that the previous message is old enough that the person read it.
@@ -421,11 +402,9 @@ async def on_message(message):
         print(traceback.format_exc())
         # Send a message and reaction when it fails
         await message.channel.send(str(e))
-        if debug:
+        if TEST:
             await message.channel.send(str(traceback.format_exc()))
         await message.add_reaction("❌")
-
-
 
 async def websocket_handler(request):
     ws = web.WebSocketResponse()
@@ -466,7 +445,6 @@ async def handle_story(request):
 async def root_handler(request):
     raise web.HTTPFound('/static/index.html')
 
-
 async def Process_Existing_story(request):
     
     
@@ -485,32 +463,35 @@ async def process_response(request):
     return web.json_response({"status": "success"})
 
 async def start_web_server_and_bot():
-    if run_web_server:
-        app = web.Application()
-        app['websockets'] = [] # List to keep track of WebSocket connections
-        app.router.add_get('/', root_handler)
-        app.router.add_get('/audit', audit_handler)
-        app.router.add_get('/audit/next', fetch_next_message)
-        app.router.add_post('/audit/action', process_response)
-        app.router.add_static('/static/', path='static', name='static')
-        #app.router.add_get('/', handle_story)  # Existing story handler
-        app.router.add_get('/story', handle_story)
-
-        app.router.add_get('/ws', websocket_handler)  # WebSocket route
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
-        await site.start()
-        print('Web server running at localhost 8080')
+    app = web.Application()
+    app['websockets'] = [] # List to keep track of WebSocket connections
+    app.router.add_get('/', root_handler)
+    app.router.add_get('/audit', audit_handler)
+    app.router.add_get('/audit/next', fetch_next_message)
+    app.router.add_post('/audit/action', process_response)
+    app.router.add_static('/static/', path='static', name='static')
+    #app.router.add_get('/', handle_story)  # Existing story handler
+    app.router.add_get('/story', handle_story)
+    app.router.add_get('/ws', websocket_handler)  # WebSocket route
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '127.0.0.1', 8080)  # Listen on localhost:8080
+    await site.start()
+    print('Web server running at localhost 8080')
     await bot.start(TOKEN)
 
+
+
+
 def main():
+
+    envManager = EnvManager()
+
+
     initialize_db()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_web_server_and_bot())
     
-
-
 if __name__ == '__main__':
     
 
