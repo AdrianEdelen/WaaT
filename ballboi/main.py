@@ -475,7 +475,7 @@ async def start_web_server_and_bot():
     app.router.add_get('/ws', websocket_handler)  # WebSocket route
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)  # Listen on localhost:8080
+    site = web.TCPSite(runner, '127.0.0.1', 8080)  # Listen on localhost:8080
     await site.start()
     print('Web server running at localhost 8080')
     await bot.start(TOKEN)
