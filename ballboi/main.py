@@ -12,31 +12,18 @@ import json
 import random
 import asyncio
 import os
-#TODO: This is for dev only
-#TODO: setup dev env vars better
-debug = False
 
-test = False
-run_web_server = False
+
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
-TEST = os.getenv("TEST", False)
-if TEST:
-    channel_name = 'teststory'
-    meta_channel_name = 'teststory-meta'
-    db = '/data/test.db'
-else:
-    channel_name = 'Word at a Time Story'
-    meta_channel_name = 'Word at a time meta'
-    db = '/data/live.db'
 
-# Define a base directory
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
+channel_name = 'Word at a Time Story'
+meta_channel_name = 'Word at a time meta'
+db = os.path.join(base_dir, 'data', 'live.db')
 
-# Path for the database
-db_path = os.path.join(base_dir, 'data', 'live.db')
-db_dir = os.path.dirname(db_path)
-
+db_dir = os.path.dirname(db)
 if not os.path.exists(db_dir):
     os.makedirs(db_dir)
 
@@ -496,7 +483,13 @@ async def start_web_server_and_bot():
         print('Web server running at localhost 8080')
     await bot.start(TOKEN)
 
+from env_manager import EnvManager
+
 def main():
+
+    envManager = EnvManager()
+
+
     initialize_db()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_web_server_and_bot())

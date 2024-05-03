@@ -19,4 +19,4 @@ ENV GUILD_ID=guildId
 VOLUME /data
 
 # Run the bot script when the container launches
-CMD ["python", "main.py"]
+CMD ["python", "/ballboi/main.py"]
