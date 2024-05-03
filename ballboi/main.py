@@ -1,5 +1,3 @@
-
-
 import sqlite3
 import discord
 from discord.ext import commands
@@ -16,7 +14,7 @@ from utils.env_manager import EnvManager
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
-
+TEST = os.getenv("TEST", False)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 base_dir = os.path.dirname(current_dir)
@@ -255,8 +253,8 @@ async def find_forum_post_by_title(forum_channel_name, post_title):
 
 @bot.event
 async def on_ready():
-    if debug:
-        print("Debug mode on, do not use in production, fr")
+    if TEST:
+        print("TEST mode on, do not use in production, fr")
         
     forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
     post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
@@ -363,7 +361,7 @@ async def on_message(message):
             last_message = get_last_message()
             if last_message is not None: #send the starter message
             # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not debug: 
+                if author_name == last_message[3] and not TEST: 
                     raise Exception("You were the last one to contribute to the story.")
                 
                 #checking that the previous message is old enough that the person read it.
@@ -404,7 +402,7 @@ async def on_message(message):
         print(traceback.format_exc())
         # Send a message and reaction when it fails
         await message.channel.send(str(e))
-        if debug:
+        if TEST:
             await message.channel.send(str(traceback.format_exc()))
         await message.add_reaction("❌")
 
