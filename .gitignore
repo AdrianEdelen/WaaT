@@ -1,3 +1,5 @@
 
 *.db
 .env
+ballboi/__pycache__/
+utils/__pycache__/

@@ -12,13 +12,14 @@ import json
 import random
 import asyncio
 import os
-
+from utils.env_manager import EnvManager
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("GUILD_ID")
 
 
-base_dir = os.path.dirname(os.path.abspath(__file__))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.dirname(current_dir)
 channel_name = 'Word at a Time Story'
 meta_channel_name = 'Word at a time meta'
 db = os.path.join(base_dir, 'data', 'live.db')
@@ -483,7 +484,8 @@ async def start_web_server_and_bot():
         print('Web server running at localhost 8080')
     await bot.start(TOKEN)
 
-from env_manager import EnvManager
+
+
 
 def main():
 

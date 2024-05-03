@@ -3,7 +3,7 @@ class EnvManager:
     def __init__(self):
         self.DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "No Token")
         self.GUILD_ID = os.getenv("GUILD_ID", "NO GUILD ID")
-        self.TEST = os.getnev("TEST", False)
+        self.TEST = os.getenv("TEST", False)
         self.WEBSERVER_PORT = os.getenv("WEBSERVER_PORT", 8080)
 
     @staticmethod
@@ -15,4 +15,4 @@ class EnvManager:
                 return default
             else:
                 raise Exception(f"Environement variable {name} not set.")
-                
+
