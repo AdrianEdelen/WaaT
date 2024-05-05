@@ -12,22 +12,20 @@ import asyncio
 import os
 from utils.env_manager import EnvManager
 
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-GUILD_ID = os.getenv("GUILD_ID")
-TEST = os.getenv("TEST", False)
 
+#Global Dependencies
+EnvManager = EnvManager()
+
+
+#db file path location 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 base_dir = os.path.dirname(current_dir)
-channel_name = 'Word at a Time Story'
-meta_channel_name = 'Word at a time meta'
 db = os.path.join(base_dir, 'data', 'live.db')
-
 db_dir = os.path.dirname(db)
 if not os.path.exists(db_dir):
     os.makedirs(db_dir)
 
 
-guild_id = GUILD_ID
 websockets = []  # Global list to keep track of WebSocket connections
 intents = discord.Intents.default()
 intents.message_content = True
@@ -45,7 +43,9 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 #TODO: parse words against a dictionary to find and stop common exploits like word smushing
 #TODO: create mapping objects (or use an orm) so I don't have to access indices of stuff
 #TODO: Settings class and settings table, this can enable things like debugs, bypasses, website, cooldown rules and times, etc
-
+#TODO: create method for db file location (seen above)
+#TODO: on meta channel slash command where you reply to a user on meta and get the words that were said around the time they made the post on the meta channel to get the context of what they were talking about (ephemeral)
+#TODO: when we have all messages recorded in db, programatically create word cloud of a users words, /wordcloud 
 def initialize_db():
     conn = sqlite3.connect(db)
     cursor = conn.cursor()
@@ -224,7 +224,7 @@ async def scan_channel_history(channel):
         print("No messages found.")
 
 async def find_forum_post_by_title(forum_channel_name, post_title):
-    guild = bot.get_guild(guild_id)
+    guild = bot.get_guild(EnvManager.GUILD_ID)
     if not guild:
         print("Guild not found")
         return None
@@ -253,11 +253,11 @@ async def find_forum_post_by_title(forum_channel_name, post_title):
 
 @bot.event
 async def on_ready():
-    if TEST:
+    if EnvManager.TEST:
         print("TEST mode on, do not use in production, fr")
         
-    forum_channel_name = 'hobbies-and-misc'  # Replace with your forum channel's name
-    post_title = 'Word at a Time Story'  # The title of the forum post you're looking for
+    forum_channel_name = 'hobbies-and-misc'  
+    post_title = 'Word at a Time Story'  
 
     #for cn in bot.get_all_channels():
     #    print(cn.name)
@@ -338,10 +338,12 @@ async def join_words(words):
 
 @bot.event
 async def on_message(message):
-    channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
+    waat_channel = discord.utils.get(bot.get_all_channels(), name=EnvManager.WAAT_CHANNEL_NAME)
+    #TODO: log verbose if waat_channel is None
+    #TODO: extract the waat_functionality out of on_message to clean up on_message
 
     try:
-        if message.author == bot.user or message.channel.name != channel_name:
+        if message.author == bot.user or message.channel.name != EnvManager.WAAT_CHANNEL_NAME:
             return
 
         # Extract the first word from the message
@@ -361,7 +363,7 @@ async def on_message(message):
             last_message = get_last_message()
             if last_message is not None: #send the starter message
             # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not TEST: 
+                if author_name == last_message[3] and not EnvManager.TEST: 
                     raise Exception("You were the last one to contribute to the story.")
                 
                 #checking that the previous message is old enough that the person read it.
@@ -381,7 +383,7 @@ async def on_message(message):
             record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
-            await construct_and_send_message(channel=channel, message=message)
+            await construct_and_send_message(channel=waat_channel, message=message)
 
             embed = discord.Embed(
                description=f'{first_word}' 
@@ -402,7 +404,7 @@ async def on_message(message):
         print(traceback.format_exc())
         # Send a message and reaction when it fails
         await message.channel.send(str(e))
-        if TEST:
+        if EnvManager.TEST:
             await message.channel.send(str(traceback.format_exc()))
         await message.add_reaction("❌")
 
@@ -478,14 +480,12 @@ async def start_web_server_and_bot():
     site = web.TCPSite(runner, '127.0.0.1', 8080)  # Listen on localhost:8080
     await site.start()
     print('Web server running at localhost 8080')
-    await bot.start(TOKEN)
+    await bot.start(EnvManager.DISCORD_BOT_TOKEN)
 
 
 
 
 def main():
-
-    envManager = EnvManager()
 
 
     initialize_db()
@@ -493,6 +493,4 @@ def main():
     loop.run_until_complete(start_web_server_and_bot())
     
 if __name__ == '__main__':
-    
-
     main()
