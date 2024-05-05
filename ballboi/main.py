@@ -350,6 +350,12 @@ async def on_message(message):
 
         # Extract the first word from the message
         message_parts = message.content.split(maxsplit=1)  # Split the message into two parts at most
+        
+        is_new_line = False
+        if '\\n' in message_parts:
+            is_new_line = True
+
+
         first_word = message_parts[0] if message_parts else None  # First word is the first part
         rest_of_message = message_parts[1] if len(message_parts) > 1 else ""  # Rest of the message is the second part, if it exists
 
@@ -364,12 +370,10 @@ async def on_message(message):
                 avatar = ''
             last_message = get_last_message()
             if last_message is not None: #send the starter message
-            # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not EnvManager.TEST: 
+                if author_name == last_message[3] and not EnvManager.TEST: # Check if this user was the last one to send a message
                     raise Exception("You were the last one to contribute to the story.")
                 
                 #checking that the previous message is old enough that the person read it.
-                #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
                 last_message_timestamp = datetime.fromisoformat(last_message[2])
                 random_seconds = random.randint(3, 5)
                 delta = timedelta(seconds=random_seconds)
@@ -385,7 +389,7 @@ async def on_message(message):
             record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
-            await construct_and_send_message(channel=waat_channel, message=message)
+            await construct_and_send_message(channel=waat_channel, message=message, )
 
             embed = discord.Embed(
                description=f'{first_word}' 
