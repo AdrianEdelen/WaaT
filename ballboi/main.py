@@ -255,17 +255,18 @@ async def find_forum_post_by_title(forum_channel_name, post_title):
 async def on_ready():
     if EnvManager.TEST:
         print("TEST mode on, do not use in production, fr")
-        
-    forum_channel_name = 'hobbies-and-misc'  
-    post_title = 'Word at a Time Story'  
+    
+    #TODO: not working come back to later adrian
+    # forum_channel_name = 'hobbies-and-misc'  
+    # post_title = 'Word at a Time Story'  
 
-    #for cn in bot.get_all_channels():
-    #    print(cn.name)
-    thread = await find_forum_post_by_title(forum_channel_name, post_title)
-    if thread:
-        print(f"Found forum post: {thread.name} (ID: {thread.id})")
-    else:
-        print("Forum post not found")
+    # #for cn in bot.get_all_channels():
+    # #    print(cn.name)
+    # thread = await find_forum_post_by_title(forum_channel_name, post_title)
+    # if thread:
+    #     print(f"Found forum post: {thread.name} (ID: {thread.id})")
+    # else:
+    #     print("Forum post not found")
 
 
     # channel = discord.utils.get(bot.get_all_channels(), name=channel_name)
