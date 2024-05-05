@@ -14,6 +14,8 @@ COPY . .
 # Set environment variable defaults if not provided
 ENV DISCORD_BOT_TOKEN=YourTokenHere
 ENV GUILD_ID=guildId
+ENV WAAT_CHANNEL_NAME=ChannelNameHere
+ENV WAAT_META_CHANNEL_NAME=MetaChannelNameHere
 
 # Expose volume for external database storage
 VOLUME /data
