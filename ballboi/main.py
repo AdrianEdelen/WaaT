@@ -340,7 +340,8 @@ async def join_words(words):
 @bot.event
 async def on_message(message):
     waat_channel = discord.utils.get(bot.get_all_channels(), name=EnvManager.WAAT_CHANNEL_NAME)
-    #TODO: log verbose if waat_channel is None
+    if waat_channel is None:
+        print(f"waat_channel not found. Looking for {EnvManager.WAAT_CHANNEL_NAME}")
     #TODO: extract the waat_functionality out of on_message to clean up on_message
 
     try:
