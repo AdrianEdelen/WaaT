@@ -10,20 +10,23 @@ import json
 import random
 import asyncio
 import os
+
 from utils.env_manager import EnvManager
+
+from database.engine import engine
+from database.base import Base
+from database.models import WaatWord
+from database.session import get_session
+from database.utils import update_record
+
+from ballboi.repository import waatword_queries
 
 
 #Global Dependencies
 EnvManager = EnvManager()
 
 
-#db file path location 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.dirname(current_dir)
-db = os.path.join(base_dir, 'data', 'live.db')
-db_dir = os.path.dirname(db)
-if not os.path.exists(db_dir):
-    os.makedirs(db_dir)
+
 
 
 websockets = []  # Global list to keep track of WebSocket connections
@@ -46,161 +49,20 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 #TODO: create method for db file location (seen above)
 #TODO: on meta channel slash command where you reply to a user on meta and get the words that were said around the time they made the post on the meta channel to get the context of what they were talking about (ephemeral)
 #TODO: when we have all messages recorded in db, programatically create word cloud of a users words, /wordcloud 
-def initialize_db():
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS story (
-            id INTEGER PRIMARY KEY,
-            word TEXT,
-            timestamp DATETIME,
-            user TEXT,
-            createdOn DATETIME,
-            meta_message TEXT,
-            avatar_url
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bot_last_message (
-            channel_id INTEGER PRIMARY KEY,
-            message_id INTEGER
-        )
-    ''')
-                   
-    conn.commit()
-    conn.close()
-
-def save_last_message(channel_id, message_id):
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO bot_last_message (channel_id, message_id)
-        VALUES (?, ?)
-        ON CONFLICT(channel_id) DO UPDATE SET message_id = excluded.message_id;
-    ''', (channel_id, message_id))
-    conn.commit()
-    conn.close()
-
-def get_last_bot_message(channel_id):
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT message_id FROM bot_last_message WHERE channel_id = ?', (channel_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return row[0] if row else None
-
-async def delete_last_message(channel):
-    last_message_id = get_last_bot_message(channel.id)
-    if last_message_id:
-        try:
-            msg = await channel.fetch_message(last_message_id)
-            await msg.delete()
-        except Exception as e:
-            print(f"Failed to delete message: {e}")
-
-def insert_word(word, user, timestamp, meta_message, avatar_url):
-
-    conn = sqlite3.connect(db)
-    try:
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO story (word, timestamp, user, createdOn, meta_message, avatar_url)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (word, timestamp, user, datetime.now(), meta_message, avatar_url))
-        id = cursor.lastrowid
-        conn.commit()
-    except sqlite3.IntegrityError:
-        print(f'entry already exists:{word} {timestamp} {user}')
-        pass
-    finally:
-        conn.close()
-        return id
-    
-def get_message_by_id(id):
-        conn = sqlite3.connect(db)
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM story WHERE id = ?', (id, ))
-        message = cursor.fetchone()
-
-        if message:
-            print(f"Message Found {message}")
-        else:
-            print("Message not found with specified id")
-        conn.close()
-        return message
-    
-def update_message_word(new_value, record_id):
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    
-    # Prepare the SQL query to update the record
-    sql = f'''UPDATE story
-              SET word = ?
-              WHERE id = ?'''
-    
-    # Execute the query
-    cursor.execute(sql, (new_value, record_id))
-    
-    # Commit the changes and close the connection
-    conn.commit()
-    conn.close()
-    
-def get_last_message():
-    """Fetch all words from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM story ORDER BY id DESC LIMIT 1')
-    last_message = cursor.fetchone()
-    conn.close()
-    if last_message is None:
-        return None  # Handling case where there are no entries
-    return last_message  # Assuming each row contains a single word in the first column.
-
-def get_all_words():
-    """Fetch all words from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    cursor.execute('SELECT word FROM story ORDER BY id ASC')
-    words = cursor.fetchall()
-    conn.close()
-    return [word[0] for word in words]  # Assuming each row contains a single word in the first column.
-
-def get_all_words_detailed():
-    """Fetch all words with details from the database, ordered by their position in the story."""
-    conn = sqlite3.connect(db)
-    cursor = conn.cursor()
-    # Assuming 'user' contains the author name, and 'timestamp' is when the word was added
-    cursor.execute('SELECT word, user, timestamp, meta_message, avatar_url  FROM story ORDER BY id ASC')
-    words_detailed = cursor.fetchall()
-    conn.close()
-    # Create a list of dictionaries, each containing the word and its details
-    words_with_details = [
-        {"word": word, "author": user, "timestamp": timestamp, "meta_message": meta_message, "avatar_url": avatar_url}
-        for word, user, timestamp, meta_message, avatar_url in words_detailed
-    ]
-    return words_with_details
 
 async def construct_and_send_message(channel, message):
-    words = get_all_words()
-    story = await join_words(words=words)
+    waat_words = waatword_queries.get_all_waat_words()
+    words_only = [word.word for word in waat_words]
+    story = await join_words(words=words_only)
 
-    last_message = get_last_message()
+    last_message = waatword_queries.get_most_recent_waat_word()
     
-    if last_message:
-        last_word_note = f"Last word added by {last_message[3]}: {last_message[1]}"  # Adjusted to fetch the correct indices
-    else:
-        last_word_note = "No contributions yet!"
-    if last_message[5] != "":
-        last_word_note += f"\nmeta: { last_message[5]}"
-    
-    # Discord's character limit
-    char_limit = 2000
+    char_limit = 2000 # Discord's character limit
     print(f'story length{len(story)}')
 
     if len(story) > char_limit:
         # Truncate story from the beginning to fit within limit
-        # Note: This simple truncation may cut off a word partially; you may need more logic for cleanly cutting off.
+        # Note: This simple truncation may cut off a word partially
         print('truncating message')
         story = '...' + story[-(char_limit-3):]
     print(f'sending a message that is {len(story)} characters long')
@@ -310,15 +172,14 @@ class CapitalButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         print(f"Record ID: {self.record_id}")
-        message = get_message_by_id(self.record_id)
-        print(f"Converting word: {message[1]}")
+        message = waatword_queries.get_waat_word_by_id(self.record_id)
+        print(f"Converting word: {message.word}")
         completion_text = ""
         try:
-            new_word = message[1] #store the word as a var and then 
-            new_word[0] = message[1][0].swapcase() #replace the specific char
+            new_word = message.word[0].swapcase() + message.word[1:]
             print(f"converted: {new_word}")
-            update_message_word(new_word, record_id=self.record_id )
-            completion_text = f"converted: {message[1]}"
+            update_record(model=WaatWord, record_id=self.record_id, field_name='word', new_value=new_word)
+            completion_text = f"converted: {message.word}"
         except Exception as e:
             print(e)
             completion_text = f"Unable to convert {message[1]}"
@@ -339,13 +200,17 @@ async def join_words(words):
 
 @bot.event
 async def on_message(message):
+    if message.author == bot.user:
+        print(f"bot message: {message.content} | ignoring message")
+        return
+
     waat_channel = discord.utils.get(bot.get_all_channels(), name=EnvManager.WAAT_CHANNEL_NAME)
     if waat_channel is None:
         print(f"waat_channel not found. Looking for {EnvManager.WAAT_CHANNEL_NAME}")
     #TODO: extract the waat_functionality out of on_message to clean up on_message
 
     try:
-        if message.author == bot.user or message.channel.name != EnvManager.WAAT_CHANNEL_NAME:
+        if message.channel.name != EnvManager.WAAT_CHANNEL_NAME:
             return
 
         # Extract the first word from the message
@@ -362,44 +227,39 @@ async def on_message(message):
                 avatar = message.author.avatar.url
             else:
                 avatar = ''
-            last_message = get_last_message()
-            if last_message is not None: #send the starter message
-            # Check if this user was the last one to send a message
-                if author_name == last_message[3] and not EnvManager.TEST: 
+
+            previous_word = waatword_queries.get_most_recent_waat_word()
+            if previous_word is not None: #send the starter message
+                if author_name == previous_word.user and not EnvManager.TEST: # Check if this user was the last one to send a message
                     raise Exception("You were the last one to contribute to the story.")
                 
                 #checking that the previous message is old enough that the person read it.
-                #last_message_timestamp = datetime.strptime(last_message[2], "%Y-%m-%d %H:%M:%S")
-                last_message_timestamp = datetime.fromisoformat(last_message[2])
+                last_message_timestamp = previous_word.timestamp
+                last_message_timestamp = last_message_timestamp.replace(tzinfo=timezone.utc)
                 random_seconds = random.randint(3, 5)
                 delta = timedelta(seconds=random_seconds)
                 new_timestamp = last_message_timestamp + delta
                 if new_timestamp >= datetime.now(timezone.utc): #plus a random number between 3and 5 seconds
                     raise Exception("It has been too soon since the previous message. try again in a moment")
 
-                #TODO: also add a check for the time since a given users last message. will need a users table for that
-
-
-
             # Insert the word into the database
-            record_id = insert_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
+
+            record_id = waatword_queries.add_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar_url=avatar)
             await broadcast_new_word(word=first_word, user=author_name, timestamp=timestamp, meta_message=rest_of_message, avatar=avatar)
             # After processing, construct and send the updated story
             await construct_and_send_message(channel=waat_channel, message=message)
 
             embed = discord.Embed(
-               description=f'{first_word}' 
+            description=f'{first_word}' 
             )
             embed.set_footer(text=record_id)
             embed.set_thumbnail(url=avatar)
             embed.set_author(name=f"{author_name} Said:")
-            #await delete_last_message(message.channel)
             await message.channel.send(embed=embed)
             await message.channel.send(view=ButtonViews(record_id=record_id))
             await message.add_reaction("✅")
             await message.delete()
             message.channel
-            #await save_last_message(channel_id=message.channel.id, message_id=message.id)
 
     except Exception as e:
         print(e)
@@ -440,7 +300,7 @@ async def broadcast_new_word(word, user, timestamp, meta_message, avatar):
         websockets.remove(ws)
 
 async def handle_story(request):
-    words_with_details = get_all_words_detailed()
+    words_with_details = waatword_queries.get_all_waat_words()
     return web.json_response(words_with_details)
     # story = ' '.join(words)
     # return web.FileResponse('index.html')
@@ -484,13 +344,12 @@ async def start_web_server_and_bot():
     print('Web server running at localhost 8080')
     await bot.start(EnvManager.DISCORD_BOT_TOKEN)
 
-
-
-
 def main():
 
+    #create db tables
+    Base.metadata.create_all(bind=engine)
 
-    initialize_db()
+    #initialize_db()
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_web_server_and_bot())
     
